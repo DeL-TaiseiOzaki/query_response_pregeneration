@@ -9,13 +9,17 @@ from response_generation.orchestrator_agent import OrchestratorAgent
 from response_generation.persona_agent import PersonaAgent
 from response_generation.episode_agent import EpisodeAgent
 from response_generation.tool_agent import ToolAgent
+import os
+from dotenv import load_dotenv
+
+# .envファイル読み込み
+load_dotenv()
 
 def load_persona_data(file_path: str) -> tuple[dict, list]:
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
-        # Extract persona information and conversation history
         persona = {k: v for k, v in data.items() if k != 'history'}
         conversation_history = data.get('history', [])
         
@@ -29,23 +33,26 @@ def load_persona_data(file_path: str) -> tuple[dict, list]:
 
 def process_queries(persona: dict, conversation_history: list, output_path: str):
     try:
-        # Initialize components
+        # 環境変数からAPIキーを取得
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        google_cse_id = os.getenv("GOOGLE_CSE_ID")
+
         magpie = MagpieGenerator(Config.MAGPIE_MODEL_ID)
-        filter_agent = QueryFilterAgent(Config.OPENAI_MODEL)
+        filter_agent = QueryFilterAgent(Config.OPENAI_MODEL, openai_api_key=openai_api_key)
         
-        # Initialize processing agents
-        persona_agent = PersonaAgent(Config.OPENAI_MODEL)
-        episode_agent = EpisodeAgent(Config.OPENAI_MODEL)
-        tool_agent = ToolAgent(Config.OPENAI_MODEL)
-        
+        persona_agent = PersonaAgent(persona, openai_api_key=openai_api_key)
+        episode_agent = EpisodeAgent({"history": conversation_history}, openai_api_key=openai_api_key)
+        tool_agent = ToolAgent(api_key=google_api_key, cse_id=google_cse_id, openai_api_key=openai_api_key)
+
         orchestrator = OrchestratorAgent(
             Config.OPENAI_MODEL,
             persona_agent,
             episode_agent,
-            tool_agent
+            tool_agent,
+            openai_api_key=openai_api_key
         )
         
-        # Generate and process queries
         print("Generating queries...")
         queries, _ = magpie.generate_queries(persona, conversation_history)
         
@@ -63,7 +70,6 @@ def process_queries(persona: dict, conversation_history: list, output_path: str)
                 "response": response
             })
         
-        # Save results
         output_dir = Path(output_path).parent
         output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -86,7 +92,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Load and process data
     persona, conversation_history = load_persona_data(args.input_file)
     process_queries(persona, conversation_history, args.output_file)
 

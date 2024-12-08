@@ -33,7 +33,7 @@ class MagpieGenerator:
         prompt += "\n<|im_end|>\n<|im_start|>user"
         return prompt
 
-    def generate_queries(self, persona, conversation_history, total_queries=100, step_size=10):
+    def generate_queries(self, persona, conversation_history, total_queries=30, step_size=10):
         queries = []
         negative_queries = []
         
